@@ -9,20 +9,32 @@ class Producto:
     stock_minimo: int
 
 
-def productos_por_pedir(productos: list[Producto]) -> list[Producto]:
-    for p in productos:
-        if not isinstance(p.nombre, str) or not p.nombre.strip():
-            raise ValueError("Producto con nombre vacío")
-        if not isinstance(p.stock, int) or isinstance(p.stock, bool) or p.stock < 0:
-            raise ValueError(f"Producto '{p.nombre}': stock inválido ({p.stock})")
-        if (
-            not isinstance(p.stock_minimo, int)
-            or isinstance(p.stock_minimo, bool)
-            or p.stock_minimo < 0
-        ):
-            raise ValueError(
-                f"Producto '{p.nombre}': stock_minimo inválido ({p.stock_minimo})"
-            )
+def _es_cantidad_valida(valor: object) -> bool:
+    """Entero >= 0. Se excluye bool porque en Python True es un int."""
+    return isinstance(valor, int) and not isinstance(valor, bool) and valor >= 0
 
-    por_pedir = [p for p in productos if p.stock <= p.stock_minimo]
-    return sorted(por_pedir, key=lambda p: (-(p.stock_minimo - p.stock), p.nombre))
+
+def _validar(producto: Producto) -> None:
+    if not isinstance(producto.nombre, str) or not producto.nombre.strip():
+        raise ValueError("Producto con nombre vacío")
+    for campo in ("stock", "stock_minimo"):
+        valor = getattr(producto, campo)
+        if not _es_cantidad_valida(valor):
+            raise ValueError(f"Producto '{producto.nombre}': {campo} inválido ({valor})")
+
+
+def _faltante(producto: Producto) -> int:
+    return producto.stock_minimo - producto.stock
+
+
+def _orden_de_urgencia(producto: Producto) -> tuple[int, str]:
+    """Mayor faltante primero; en empate, alfabético por nombre."""
+    return (-_faltante(producto), producto.nombre)
+
+
+def productos_por_pedir(productos: list[Producto]) -> list[Producto]:
+    for producto in productos:
+        _validar(producto)
+
+    por_pedir = [p for p in productos if _faltante(p) >= 0]
+    return sorted(por_pedir, key=_orden_de_urgencia)
